@@ -28,14 +28,13 @@ def step(offset: int, length: int, maxRequestSize: int) -> Generator:
     to read the correct lz4 frames from the stream.
     """
     blockOffset = offset
+    blockOffset = offset
     if isinstance(length, dict):
-        blockOffset = offset
         compressOffset = list(length.keys())[0]
         for part in length[compressOffset]:
             blockOffset += part
             yield part, blockOffset
     else:
-        blockOffset = offset
         while blockOffset < offset + length:
             blocklen = min(offset + length - blockOffset, maxRequestSize)
             yield blocklen, blockOffset
@@ -51,7 +50,7 @@ def write(writer: IO[Any], block, nbdCon, btype: str, compress: bool) -> int:
         writer.seek(block.offset)
     data = nbdCon.nbd.pread(block.length, block.offset)
 
-    if compress is not False and btype != "raw":
+    if compress and btype != "raw":
         data = lz4.compressFrame(data, compress)
 
     return writer.write(data)

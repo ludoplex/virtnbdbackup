@@ -132,8 +132,7 @@ class client:
                 log.info("Waiting for NBD Server, Retry: %s", retry)
                 retry = retry + 1
 
-            connection = self._connect()
-            if connection:
+            if connection := self._connect():
                 log.info("Connection to NBD backend succeeded.")
                 self.connection = connection
                 return self

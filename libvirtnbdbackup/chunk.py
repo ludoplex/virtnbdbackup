@@ -83,10 +83,8 @@ def read(
             data = lz4.decompressFrame(reader.read(blocklen))
             nbdCon.nbd.pwrite(data, offset)
             offset += len(data)
-            wSize += len(data)
         else:
             data = reader.read(blocklen)
             nbdCon.nbd.pwrite(data, blockOffset)
-            wSize += len(data)
-
+        wSize += len(data)
     return wSize

@@ -26,10 +26,7 @@ def addRemoteArgs(opt: _ArgumentGroup) -> None:
 
     user = getuser() or None
 
-    session = "qemu:///system"
-    if user != "root":
-        session = "qemu:///session"
-
+    session = "qemu:///session" if user != "root" else "qemu:///system"
     opt.add_argument(
         "-U",
         "--uri",

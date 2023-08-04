@@ -308,11 +308,11 @@ def main() -> None:
     if args.compress:
         logging.info("Compression enabled, level [%s]", args.compress)
 
-    if args.stdout is True and args.type == "raw":
+    if args.stdout and args.type == "raw":
         logging.error("Output type raw not supported to stdout.")
         sys.exit(1)
 
-    if args.stdout is True and args.raw is True:
+    if args.stdout and args.raw is True:
         logging.error("Saving raw images to stdout is not supported.")
         sys.exit(1)
 
@@ -413,8 +413,8 @@ def main() -> None:
         "Backup will save [%s] attached disks.",
         len(disks),
     )
-    if args.worker is None or args.worker > int(len(disks)):
-        args.worker = int(len(disks))
+    if args.worker is None or args.worker > len(disks):
+        args.worker = len(disks)
     logging.info("Concurrent backup processes: [%s]", args.worker)
 
     if args.killonly is True:
@@ -542,9 +542,7 @@ def setTargetFile(args: Namespace, disk: DomainDisk, ext: str = "data"):
     and qemu disk info"""
     targetFile: str = ""
     if args.level in ("full", "copy"):
-        level = args.level
-        if disk.format == "raw":
-            level = "copy"
+        level = "copy" if disk.format == "raw" else args.level
         targetFile = f"{args.output}/{disk.target}.{level}.{ext}"
     elif args.level in ("inc", "diff"):
         cptName = lib.getIdent(args)
@@ -562,26 +560,22 @@ def getWriter(
     if args.stdout is True:
         targetFile = os.path.basename(targetFile)
         logging.info("Writing data to zip archive.")
-        writer = fileStream.open(targetFile)
+        return fileStream.open(targetFile)
     else:
         logging.info("Write data to target file: [%s].", targetFilePartial)
-        writer = fileStream.open(targetFilePartial)
-
-    return writer
+        return fileStream.open(targetFilePartial)
 
 
 def getExtentHandler(args: Namespace, nbdClient):
     """Query dirty blocks either via qemu client or self
     implemented extend handler"""
-    if args.qemu:
-        logging.info("Using qemu tools to query extents")
-        extentHandler = extenthandler.ExtentHandler(
-            qemu.util(nbdClient.cType.exportName), nbdClient.cType
-        )
-    else:
-        extentHandler = extenthandler.ExtentHandler(nbdClient, nbdClient.cType)
+    if not args.qemu:
+        return extenthandler.ExtentHandler(nbdClient, nbdClient.cType)
 
-    return extentHandler
+    logging.info("Using qemu tools to query extents")
+    return extenthandler.ExtentHandler(
+        qemu.util(nbdClient.cType.exportName), nbdClient.cType
+    )
 
 
 def startOfflineNBD(
@@ -590,9 +584,7 @@ def startOfflineNBD(
     """Start background qemu-nbd process used during backup
     if domain is offline, in case of remote backup, initiate
     ssh session and start process on remote system."""
-    bitMap: str = ""
-    if args.level in ("inc", "diff"):
-        bitMap = args.cpt.name
+    bitMap = args.cpt.name if args.level in ("inc", "diff") else ""
     socket = f"{args.socketfile}.{disk.target}"
     if remoteHost != "":
         logging.info(
@@ -658,11 +650,8 @@ def backupDisk(
     streamType = setStreamType(args, disk)
     metaContext = nbdcli.context.get(args, disk)
     nbdProc: processInfo
-    remoteIP: str = virtClient.remoteHost
     port: int = args.nbd_port
-    if args.nbd_ip != "":
-        remoteIP = args.nbd_ip
-
+    remoteIP = args.nbd_ip if args.nbd_ip != "" else virtClient.remoteHost
     if args.offline is True:
         port = args.nbd_port + count
         try:
@@ -752,8 +741,7 @@ def backupDisk(
                 if args.compress:
                     logging.debug("Compressed size: %s", size)
                     if cSizes:
-                        blockList = {}
-                        blockList[size] = cSizes
+                        blockList = {size: cSizes}
                         compressedSizes.append(blockList)
                     else:
                         compressedSizes.append(size)
@@ -761,11 +749,10 @@ def backupDisk(
                     assert size == save.length
 
             progressBar.update(save.length)
-        else:
-            if streamType == "raw":
-                writer.seek(save.offset)
-            elif streamType == "stream" and args.level not in ("inc", "diff"):
-                stream.writeFrame(writer, sTypes.ZERO, save.offset, save.length)
+        elif streamType == "raw":
+            writer.seek(save.offset)
+        elif streamType == "stream" and args.level not in ("inc", "diff"):
+            stream.writeFrame(writer, sTypes.ZERO, save.offset, save.length)
     if streamType == "stream":
         stream.writeFrame(writer, sTypes.STOP, 0, 0)
         if args.compress:

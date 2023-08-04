@@ -120,12 +120,7 @@ class client:
         """Check if we want to use advanced auth method"""
         if args.uri.startswith("qemu+"):
             return True
-        if self._reqAuth(args.uri):
-            return True
-        if args.user or args.password:
-            return True
-
-        return False
+        return True if self._reqAuth(args.uri) else bool(args.user or args.password)
 
     def _connect(self, args: Namespace) -> libvirt.virConnect:
         """return libvirt connection handle"""
@@ -247,7 +242,7 @@ class client:
             log.error("Failed to define domain: [%s]", errmsg)
             return False
 
-        if autoStart is True:
+        if autoStart:
             self.domainAutoStart(domObj)
 
         return True
@@ -297,10 +292,7 @@ class client:
             pass
 
         name = tree.xpath("name")[0]
-        if args.name is None:
-            domainName = f"restore_{name.text}"
-        else:
-            domainName = args.name
+        domainName = f"restore_{name.text}" if args.name is None else args.name
         log.info("Changing name from [%s] to [%s]", name.text, domainName)
         name.text = domainName
 
@@ -327,8 +319,7 @@ class client:
                 )
                 disk.getparent().remove(disk)
                 continue
-            backingStore = disk.xpath("backingStore")
-            if backingStore:
+            if backingStore := disk.xpath("backingStore"):
                 log.info("Removing existent backing store settings")
                 disk.remove(backingStore[0])
 
@@ -386,10 +377,7 @@ class client:
         tree = xml.asTree(vmConfig)
         devices = []
 
-        excludeList = None
-        if args.exclude is not None:
-            excludeList = args.exclude.split(",")
-
+        excludeList = args.exclude.split(",") if args.exclude is not None else None
         for disk in tree.xpath("devices/disk"):
             dev = disk.xpath("target")[0].get("dev")
             device = disk.get("device")
@@ -462,12 +450,8 @@ class client:
                 top, "server", {"transport": "unix", "socket": f"{args.socketfile}"}
             )
         else:
-            listen = self.remoteHost
-            tls = "no"
-            if args.tls:
-                tls = "yes"
-            if args.nbd_ip != "":
-                listen = args.nbd_ip
+            tls = "yes" if args.tls else "no"
+            listen = args.nbd_ip if args.nbd_ip != "" else self.remoteHost
             ElementTree.SubElement(
                 top,
                 "server",

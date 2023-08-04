@@ -125,8 +125,7 @@ def getDataRanges(stream, sTypes, reader) -> Tuple[List, Dict]:
             dataRanges[-1]["nextBlockOffset"] = None
             break
 
-        blockInfo = {}
-        blockInfo["offset"] = reader.tell()
+        blockInfo = {"offset": reader.tell()}
         blockInfo["originalOffset"] = start
         blockInfo["nextOriginalOffset"] = start + length
         blockInfo["length"] = length
@@ -252,7 +251,7 @@ def main() -> None:
     checkDevice(args, args.device)
     dataFiles = args.file.split(",")
 
-    if len(dataFiles) > 1 and not "full.data" in dataFiles[0]:
+    if len(dataFiles) > 1 and "full.data" not in dataFiles[0]:
         logging.error("Sequence must start with a full backup")
     if len(dataFiles) > 1 and args.readonly:
         logging.error("Device mapping with incrementals doesn't work in readonly mode")

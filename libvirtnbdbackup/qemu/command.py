@@ -50,7 +50,7 @@ def run(cmdLine: List[str], pidFile: str = "", toPipe: bool = False) -> processI
     """Execute passed command"""
     logFileName: str = ""
     logFile: Union[int, tempfile._TemporaryFileWrapper]
-    if toPipe is True:
+    if toPipe:
         logFile = subprocess.PIPE
     else:
         # pylint: disable=consider-using-with
@@ -61,11 +61,11 @@ def run(cmdLine: List[str], pidFile: str = "", toPipe: bool = False) -> processI
 
     log.debug("CMD: %s", " ".join(cmdLine))
     with subprocess.Popen(
-        cmdLine,
-        close_fds=True,
-        stderr=logFile,
-        stdout=logFile,
-    ) as p:
+            cmdLine,
+            close_fds=True,
+            stderr=logFile,
+            stdout=logFile,
+        ) as p:
         p.wait()
         log.debug("Return code: %s", p.returncode)
         err: str = ""
@@ -73,20 +73,16 @@ def run(cmdLine: List[str], pidFile: str = "", toPipe: bool = False) -> processI
         if p.returncode != 0:
             log.error("CMD: %s", " ".join(cmdLine))
             log.debug("Read error messages from logfile")
-            if toPipe is True:
+            if toPipe:
                 out, err = _readpipe(p)
             else:
                 err = _readlog(logFileName, cmdLine[0])
             raise ProcessError(f"Unable to start [{cmdLine[0]}] error: [{err}]")
 
-        if toPipe is True:
+        if toPipe:
             out, err = _readpipe(p)
 
-        if pidFile != "":
-            realPid = int(_readlog(pidFile, ""))
-        else:
-            realPid = p.pid
-
+        realPid = int(_readlog(pidFile, "")) if pidFile != "" else p.pid
         process = processInfo(realPid, logFileName, err, out, pidFile)
         log.debug("Started [%s] process: [%s]", cmdLine[0], process)
 

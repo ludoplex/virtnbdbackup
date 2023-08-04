@@ -58,13 +58,9 @@ def getXml(cptObj: libvirt.virDomainCheckpoint) -> str:
 
 def getSize(domObj: libvirt.virDomain, checkpointName: str) -> int:
     """Return current size of checkpoint for all disks"""
-    size = 0
     cpt = exists(domObj, checkpointName)
     cptTree = xml.asTree(getXml(cpt))
-    for s in cptTree.xpath("disks/disk/@size"):
-        size += int(s)
-
-    return size
+    return sum(int(s) for s in cptTree.xpath("disks/disk/@size"))
 
 
 def delete(cptObj: libvirt.virDomainCheckpoint, checkpointName: str) -> bool:
@@ -115,8 +111,7 @@ def _hasForeign(domObj: libvirt.virDomain, checkpointName: str) -> Optional[str]
     ourself. In case we detect an checkpoint that does not
     match our name, return so.
     """
-    cpts = domObj.listAllCheckpoints()
-    if cpts:
+    if cpts := domObj.listAllCheckpoints():
         for cpt in cpts:
             checkpointName = cpt.getName()
             log.debug("Found foreign checkpoint: [%s]", checkpointName)
@@ -168,16 +163,14 @@ def removeAll(
         return False
 
     if checkpointList is None:
-        cpts = domObj.listAllCheckpoints()
-        if cpts:
+        if cpts := domObj.listAllCheckpoints():
             for cpt in cpts:
                 if delete(cpt, checkpointName) is False:
                     return False
         return True
 
     for cp in checkpointList:
-        cptObj = exists(domObj, cp)
-        if cptObj:
+        if cptObj := exists(domObj, cp):
             if delete(cptObj, checkpointName) is False:
                 return False
     return True
@@ -288,17 +281,16 @@ def create(
             raise RedefineCheckpointError("Failed to redefine checkpoints.")
 
     log.info("Checkpoint handling.")
-    if args.level == "full" and checkpoints:
-        log.info("Removing all existent checkpoints before full backup.")
-        if not removeAll(domObj, checkpoints, args, defaultCheckpointName):
+    if args.level == "full":
+        if checkpoints:
+            log.info("Removing all existent checkpoints before full backup.")
+            if removeAll(domObj, checkpoints, args, defaultCheckpointName):
+                os.remove(cptFile)
+            else:
+                raise RemoveCheckpointError("Failed to remove checkpoint.")
+        elif not removeAll(domObj, None, args, defaultCheckpointName):
             raise RemoveCheckpointError("Failed to remove checkpoint.")
-        os.remove(cptFile)
         checkpoints = []
-    elif args.level == "full" and len(checkpoints) < 1:
-        if not removeAll(domObj, None, args, defaultCheckpointName):
-            raise RemoveCheckpointError("Failed to remove checkpoint.")
-        checkpoints = []
-
     if checkpoints and args.level in ("inc", "diff"):
         nextCpt = len(checkpoints)
         checkpointName = f"{defaultCheckpointName}.{nextCpt}"
@@ -313,7 +305,7 @@ def create(
     if args.level == "diff":
         log.info("Diff backup: saving delta since checkpoint: [%s].", parentCheckpoint)
 
-    if args.level in ("inc", "diff") and len(checkpoints) < 1:
+    if args.level in ("inc", "diff") and not checkpoints:
         raise NoCheckpointsFound(
             "No existing checkpoints found, execute full backup first."
         )

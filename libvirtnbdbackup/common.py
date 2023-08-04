@@ -55,11 +55,7 @@ def printVersion(version) -> None:
 
 def setLogLevel(verbose: bool) -> int:
     """Set loglevel"""
-    level = logging.INFO
-    if verbose is True:
-        level = logging.DEBUG
-
-    return level
+    return logging.DEBUG if verbose else logging.INFO
 
 
 def sshSession(args: Namespace, remoteHost: str) -> Union[ssh.client, None]:
@@ -97,7 +93,7 @@ def configLogger(
         logging.StreamHandler(stream=sys.stderr),
         counter,
     ]
-    if syslog is True:
+    if syslog:
         handler.append(logging.handlers.SysLogHandler(address="/dev/log"))
     logging.basicConfig(
         level=setLogLevel(args.verbose),
@@ -125,8 +121,7 @@ def targetIsEmpty(args: Namespace) -> bool:
     """Check if target directory does not include an backup
     already (no .data or .data.partial files)"""
     if exists(args, args.output) and args.level in ("full", "copy", "auto"):
-        dirList = glob.glob(f"{args.output}/*.data*")
-        if len(dirList) > 0:
+        if dirList := glob.glob(f"{args.output}/*.data*"):
             return False
 
     return True
@@ -157,11 +152,7 @@ def hasQcowDisks(diskList: List[Any]) -> bool:
     """Check if the list of attached disks includes at least one
     qcow image based disk, else checkpoint handling can be
     skipped and backup module falls back to type copy"""
-    for disk in diskList:
-        if disk.format.startswith("qcow"):
-            return True
-
-    return False
+    return any(disk.format.startswith("qcow") for disk in diskList)
 
 
 def copy(args: Namespace, source: str, target: str) -> None:
@@ -237,10 +228,7 @@ def dumpExtentJson(extents) -> str:
     """Dump extent object as json"""
     extList = []
     for extent in extents:
-        ext = {}
-        ext["start"] = extent.offset
-        ext["length"] = extent.length
-        ext["data"] = extent.data
+        ext = {"start": extent.offset, "length": extent.length, "data": extent.data}
         extList.append(ext)
 
     return json.dumps(extList, indent=4, sort_keys=True)

@@ -39,10 +39,7 @@ class util:
     @staticmethod
     def map(cType) -> str:
         """Read extent map using nbdinfo utility"""
-        metaOpt = "--map"
-        if cType.metaContext != "":
-            metaOpt = f"--map={cType.metaContext}"
-
+        metaOpt = f"--map={cType.metaContext}" if cType.metaContext != "" else "--map"
         cmd = f"nbdinfo --json {metaOpt} '{cType.uri}'"
         log.debug("Starting CMD: [%s]", cmd)
         extentMap = subprocess.run(
@@ -75,12 +72,9 @@ class util:
         ]
 
         if qcowOptions:
-            cmd = cmd + qcowOptions
+            cmd += qcowOptions
 
-        if not sshClient:
-            return command.run(cmd)
-
-        return sshClient.run(" ".join(cmd))
+        return command.run(cmd) if not sshClient else sshClient.run(" ".join(cmd))
 
     def info(self, targetFile: str, sshClient=None) -> processInfo:
         """Return qemu image information"""
@@ -117,11 +111,13 @@ class util:
     def _addTls(cmd: List[str], certpath: str) -> None:
         """Add required tls related options to qemu-nbd command
         line."""
-        cmd.append("--object")
-        cmd.append(
-            f"tls-creds-x509,id=tls0,endpoint=server,dir={certpath},verify-peer=false"
+        cmd.extend(
+            (
+                "--object",
+                f"tls-creds-x509,id=tls0,endpoint=server,dir={certpath},verify-peer=false",
+                "--tls-creds tls0",
+            )
         )
-        cmd.append("--tls-creds tls0")
 
     def startRemoteRestoreNbdServer(
         self, args: Namespace, targetFile: str
@@ -155,10 +151,8 @@ class util:
         self, args: Namespace, nbdkitModule: str, blockMap, fullImage: str
     ) -> processInfo:
         """Execute nbdkit process for virtnbdmap"""
-        debug = "0"
         pidFile = self._gt("nbdkit", ".pid")
-        if args.verbose:
-            debug = "1"
+        debug = "1" if args.verbose else "0"
         cmd = [
             "nbdkit",
             "--pidfile",
@@ -187,10 +181,7 @@ class util:
         self, diskFormat: str, diskFile: str, socketFile: str, bitMap: str
     ) -> processInfo:
         """Start nbd server process for offline backup operation"""
-        bitmapOpt = "--"
-        if bitMap != "":
-            bitmapOpt = f"--bitmap={bitMap}"
-
+        bitmapOpt = f"--bitmap={bitMap}" if bitMap != "" else "--"
         pidFile = f"{socketFile}.pid"
         cmd = [
             "qemu-nbd",
@@ -230,9 +221,7 @@ class util:
             "--fork",
         ]
         if args.nbd_ip != "":
-            cmd.append("-b")
-            cmd.append(args.nbd_ip)
-
+            cmd.extend(("-b", args.nbd_ip))
         if bitMap != "":
             cmd.append(f"--bitmap={bitMap}")
 

@@ -49,9 +49,7 @@ class ExtentHandler:
     """
 
     def __init__(self, nbdFh, cType) -> None:
-        self.useQemu = False
-        if nbdFh.__class__.__name__ == "util":
-            self.useQemu = True
+        self.useQemu = nbdFh.__class__.__name__ == "util"
         self._nbdFh = nbdFh
         self._cType = cType
         self._extentEntries: List[Any] = []
@@ -89,10 +87,7 @@ class ExtentHandler:
         """Query extents either via qemu or custom extent
         handler
         """
-        if self.useQemu:
-            return self.queryExtentsQemu()
-
-        return self.queryExtentsNbd()
+        return self.queryExtentsQemu() if self.useQemu else self.queryExtentsNbd()
 
     def queryExtentsQemu(self) -> List[Any]:
         """Use qemu utils to query extents from nbd
@@ -113,7 +108,7 @@ class ExtentHandler:
         """Go through extents and create a list of extent
         objects
         """
-        extentSizes = self._extentEntries[0::2]
+        extentSizes = self._extentEntries[::2]
         extentTypes = self._extentEntries[1::2]
         assert len(extentSizes) == len(extentTypes)
         ct = 0
@@ -187,17 +182,13 @@ class ExtentHandler:
         """
         data = None
         if self._metaContext == CONTEXT_BASE_ALLOCATION:
-            assert blockType in (0, 1, 2, 3)
-            if blockType == 0:
+            assert blockType in {0, 1, 2, 3}
+            if blockType in {0, 2}:
                 data = True
-            if blockType == 1:
-                data = False
-            elif blockType == 2:
-                data = True
-            elif blockType == 3:
+            elif blockType in {1, 3}:
                 data = False
         else:
-            assert blockType in (0, 1)
+            assert blockType in {0, 1}
             data = bool(blockType)
 
         assert data is not None
